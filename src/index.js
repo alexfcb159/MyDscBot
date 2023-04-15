@@ -1,5 +1,7 @@
 require('dotenv').config();
-const { Client, IntentsBitField } = require('discord.js');
+const fs = require('node:fs');
+const path = require('node:path');
+const { Client, Collection, IntentsBitField } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -10,30 +12,36 @@ const client = new Client({
     ]
 });
 
-client.on('ready', (c) => {
-    console.log(`👌${c.user.tag} is online`);
-});
+client.commands = new Collection();
 
-client.on('messageCreate', (message) => {
-    if(message.author.bot) {
-        return;
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
+        } else {
+            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+        }
     }
+};
 
-    if(message.content === 'hello') {
-        message.reply('Hey!');
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+    if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args));
+    } else {
+        client.on(event.name, (...args) => event.execute(...args));
     }
-});
-
-client.on('interactionCreate', (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
-    if (interaction.commandName === 'hey') {
-        interaction.reply('hey!');
-    };
-
-    if (interaction.commandName === 'ping') {
-        interaction.reply('pong!');
-    };
-});
+};
 
 client.login(process.env.TOKEN);
