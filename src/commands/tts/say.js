@@ -11,7 +11,16 @@ module.exports = {
         .addStringOption(option => option.setName('text').setDescription('The text to say').setRequired(true)),
 
     async execute(interaction) {
+        const voiceChannel = interaction.member.voice.channel;
+        if (!voiceChannel) {
+            return await interaction.reply({ content: 'You must be in a voice channel to use this command!', ephemeral: true });
+        };
+
         const phrase = interaction.options.getString('text');
+        if (!phrase || phrase.length > 200) {
+            return await interaction.reply({ content: 'Please provide a valid text (maximum 200 characters).', ephemeral: true });
+        };
+
         const params = new url.URLSearchParams(
             {
                 text: phrase,
@@ -41,6 +50,7 @@ module.exports = {
             await interaction.deleteReply();
         } catch (error) {
             console.log(error);
+            await interaction.reply({ content: 'An error occurred while processing your request. Please try again later.', ephemeral: true });
         }
     },
 };
