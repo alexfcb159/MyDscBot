@@ -1,17 +1,46 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { createAudioPlayer, createAudioResource, getVoiceConnection} = require('@discordjs/voice');
+const { createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
+const fetch = require('node-fetch');
+const url = require('node:url');
+const { writeFile } = require('fs').promises;
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('say')
-        .setDescription('Pronounces written text.'),
+        .setDescription('Pronounces written text.')
+        .addStringOption(option => option.setName('text').setDescription('The text to say').setRequired(true)),
+
     async execute(interaction) {
-        const player = createAudioPlayer();
-        const resource = createAudioResource(process.env.link);
-        const connection = getVoiceConnection(interaction.channel.guild.id);
-        player.play(resource);
-        connection.subscribe(player);
-        await interaction.reply({ content: 'Playing', ephemeral: true });
-        await interaction.deleteReply();
+        const phrase = interaction.options.getString('text');
+        const params = new url.URLSearchParams(
+            {
+                text: phrase,
+                lang: 'ru-RU',
+                voice: 'filipp'
+            }
+        );
+        try {
+            const response = await fetch('https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize', {
+                method: 'post',
+                body: params,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Api-Key ' + process.env.YANDEX_API_KEY,
+                },
+            });
+            const buffer = await response.buffer();
+            await writeFile('words.ogg', buffer);
+
+            const player = createAudioPlayer();
+            const resource = createAudioResource(process.env.LINK);
+            const connection = getVoiceConnection(interaction.channel.guild.id);
+            player.play(resource);
+            connection.subscribe(player);
+
+            await interaction.reply({ content: 'Saying', ephemeral: true });
+            await interaction.deleteReply();
+        } catch (error) {
+            console.log(error);
+        }
     },
 };
